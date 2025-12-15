@@ -1,0 +1,138 @@
+import { Router } from 'express';
+import { eq } from 'drizzle-orm';
+import multer from 'multer';
+import { db } from '../db/index.js';
+import { userDetails, users } from '../db/schema.js';
+import { userDetailsSchema } from '../validators/index.js';
+import { asyncHandler, NotFoundError } from '../utils/errors.js';
+import { requireAuth } from '../middleware/auth.js';
+import { getImageKit } from '../utils/imagekit.js';
+
+const router = Router();
+
+const storage = multer.memoryStorage();
+const upload = multer({
+    storage,
+    limits: {
+        fileSize: 10 * 1024 * 1024,
+    },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image files are allowed'));
+        }
+    },
+});
+
+router.get('/', asyncHandler(async (req, res) => {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+        throw new NotFoundError('User details not found');
+    }
+
+    const [user] = await db.select().from(userDetails).where(eq(userDetails.userId, userId));
+
+    if (!user) {
+        throw new NotFoundError('User details not found');
+    }
+
+    res.json({
+        success: true,
+        data: user,
+    });
+}));
+
+router.post('/', requireAuth, upload.single('profilePhoto'), asyncHandler(async (req, res) => {
+    const validated = userDetailsSchema.parse(req.body);
+
+    const [existing] = await db.select().from(userDetails).where(eq(userDetails.userId, req.user!.userId));
+    if (existing) {
+        return res.status(400).json({
+            success: false,
+            error: 'User details already exist. Use PUT to update.',
+        });
+    }
+
+    let profilePhotoUrl = validated.profilePhoto;
+
+    if (req.file) {
+        const [user] = await db.select().from(users).where(eq(users.id, req.user!.userId));
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not found',
+            });
+        }
+
+        const imagekit = getImageKit();
+
+        const result = await imagekit.upload({
+            file: req.file.buffer,
+            fileName: req.file.originalname,
+            folder: `/${user.username}`,
+            tags: [user.username, req.user!.userId, 'profile-photo'],
+        });
+
+        profilePhotoUrl = result.url;
+    }
+
+    const [newUser] = await db.insert(userDetails).values({
+        ...validated,
+        profilePhoto: profilePhotoUrl,
+        userId: req.user!.userId,
+    }).returning();
+
+    res.status(201).json({
+        success: true,
+        data: newUser,
+    });
+}));
+
+router.put('/', requireAuth, upload.single('profilePhoto'), asyncHandler(async (req, res) => {
+    const validated = userDetailsSchema.parse(req.body);
+
+    const [existing] = await db.select().from(userDetails).where(eq(userDetails.userId, req.user!.userId));
+    if (!existing) {
+        throw new NotFoundError('User details not found. Use POST to create.');
+    }
+
+    let profilePhotoUrl = validated.profilePhoto;
+
+    if (req.file) {
+        const [user] = await db.select().from(users).where(eq(users.id, req.user!.userId));
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not found',
+            });
+        }
+
+        const imagekit = getImageKit();
+
+        const result = await imagekit.upload({
+            file: req.file.buffer,
+            fileName: req.file.originalname,
+            folder: `/${user.username}`,
+            tags: [user.username, req.user!.userId, 'profile-photo'],
+        });
+
+        profilePhotoUrl = result.url;
+    }
+
+    const [updated] = await db
+        .update(userDetails)
+        .set({ ...validated, profilePhoto: profilePhotoUrl, updatedAt: new Date() })
+        .where(eq(userDetails.id, existing.id))
+        .returning();
+
+    res.json({
+        success: true,
+        data: updated,
+    });
+}));
+
+export default router;
