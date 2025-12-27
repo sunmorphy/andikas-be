@@ -6,7 +6,7 @@ import { userDetails, users } from '../db/schema.js';
 import { userDetailsSchema } from '../validators/index.js';
 import { asyncHandler, NotFoundError } from '../utils/errors.js';
 import { requireAuth } from '../middleware/auth.js';
-import { getImageKit } from '../utils/imagekit.js';
+import { uploadToR2 } from '../services/r2.js';
 
 const router = Router();
 
@@ -67,14 +67,7 @@ router.post('/', requireAuth, upload.single('profilePhoto'), asyncHandler(async 
             });
         }
 
-        const imagekit = getImageKit();
-
-        const result = await imagekit.upload({
-            file: req.file.buffer,
-            fileName: req.file.originalname,
-            folder: `/${user.username}`,
-            tags: [user.username, req.user!.userId, 'profile-photo'],
-        });
+        const result = await uploadToR2(req.file.buffer, req.file.originalname, user.username, 'users');
 
         profilePhotoUrl = result.url;
     }
@@ -111,14 +104,7 @@ router.put('/', requireAuth, upload.single('profilePhoto'), asyncHandler(async (
             });
         }
 
-        const imagekit = getImageKit();
-
-        const result = await imagekit.upload({
-            file: req.file.buffer,
-            fileName: req.file.originalname,
-            folder: `/${user.username}`,
-            tags: [user.username, req.user!.userId, 'profile-photo'],
-        });
+        const result = await uploadToR2(req.file.buffer, req.file.originalname, user.username, 'users');
 
         profilePhotoUrl = result.url;
     }

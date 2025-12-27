@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { eq } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { users } from '../db/schema.js';
+import { users, userDetails } from '../db/schema.js';
 import { hashPassword, comparePassword, generateToken } from '../utils/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { z } from 'zod';
@@ -17,58 +17,72 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-    email: z.string().email(),
+    identifier: z.string().min(1, 'Email or username is required'),
     password: z.string(),
 });
 
-router.post('/register', asyncHandler(async (req, res) => {
-    const validated = registerSchema.parse(req.body);
+// router.post('/register', asyncHandler(async (req, res) => {
+//     const validated = registerSchema.parse(req.body);
 
-    const existing = await db.select().from(users).where(eq(users.email, validated.email));
-    if (existing.length > 0) {
-        return res.status(400).json({
-            success: false,
-            error: 'Email already registered',
-        });
-    }
+//     const existing = await db.select().from(users).where(eq(users.email, validated.email));
+//     if (existing.length > 0) {
+//         return res.status(400).json({
+//             success: false,
+//             error: 'Email already registered',
+//         });
+//     }
 
-    const existingUsername = await db.select().from(users).where(eq(users.username, validated.username));
-    if (existingUsername.length > 0) {
-        return res.status(400).json({
-            success: false,
-            error: 'Username already taken',
-        });
-    }
+//     const existingUsername = await db.select().from(users).where(eq(users.username, validated.username));
+//     if (existingUsername.length > 0) {
+//         return res.status(400).json({
+//             success: false,
+//             error: 'Username already taken',
+//         });
+//     }
 
-    const hashedPassword = await hashPassword(validated.password);
+//     const hashedPassword = await hashPassword(validated.password);
 
-    const [newUser] = await db.insert(users).values({
-        email: validated.email,
-        username: validated.username,
-        password: hashedPassword,
-        name: validated.name,
-    }).returning();
+//     const [newUser] = await db.insert(users).values({
+//         email: validated.email,
+//         username: validated.username,
+//         password: hashedPassword,
+//         name: validated.name,
+//     }).returning();
 
-    const token = generateToken(newUser!.id);
+//     await db.insert(userDetails).values({
+//         userId: newUser!.id,
+//         name: validated.name,
+//         role: 'Developer',
+//         description: null,
+//         socialMedias: null,
+//     });
 
-    res.status(201).json({
-        success: true,
-        data: {
-            user: {
-                id: newUser!.id,
-                email: newUser!.email,
-                username: newUser!.username,
-                name: newUser!.name,
-            },
-            token,
-        },
-    });
-}));
+//     const token = generateToken(newUser!.id);
+
+//     res.status(201).json({
+//         success: true,
+//         data: {
+//             user: {
+//                 id: newUser!.id,
+//                 email: newUser!.email,
+//                 username: newUser!.username,
+//                 name: newUser!.name,
+//             },
+//             token,
+//         },
+//     });
+// }));
 
 router.post('/login', asyncHandler(async (req, res) => {
     const validated = loginSchema.parse(req.body);
 
-    const [user] = await db.select().from(users).where(eq(users.email, validated.email));
+    // Check if identifier is email or username
+    const [user] = await db.select().from(users).where(
+        or(
+            eq(users.email, validated.identifier),
+            eq(users.username, validated.identifier)
+        )
+    );
 
     if (!user) {
         return res.status(401).json({
@@ -94,6 +108,7 @@ router.post('/login', asyncHandler(async (req, res) => {
             user: {
                 id: user.id,
                 email: user.email,
+                username: user.username,
                 name: user.name,
             },
             token,

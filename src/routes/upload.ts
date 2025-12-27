@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { eq } from 'drizzle-orm';
-import { getImageKit } from '../utils/imagekit.js';
+import { uploadToR2 } from '../services/r2.js';
 import { asyncHandler } from '../utils/errors.js';
 import { requireAuth } from '../middleware/auth.js';
 import { db } from '../db/index.js';
@@ -41,14 +41,7 @@ router.post('/', requireAuth, upload.single('image'), asyncHandler(async (req, r
         });
     }
 
-    const imagekit = getImageKit();
-
-    const result = await imagekit.upload({
-        file: req.file.buffer,
-        fileName: req.file.originalname,
-        folder: `/${user.username}`,
-        tags: [user.username, req.user!.userId],
-    });
+    const result = await uploadToR2(req.file.buffer, req.file.originalname, user.username, 'uploads');
 
     res.json({
         success: true,

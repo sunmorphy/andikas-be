@@ -6,7 +6,7 @@ import { projects, projectSkills, users } from '../db/schema.js';
 import { projectSchema } from '../validators/index.js';
 import { asyncHandler, NotFoundError } from '../utils/errors.js';
 import { requireAuth } from '../middleware/auth.js';
-import { getImageKit } from '../utils/imagekit.js';
+import { uploadToR2 } from '../services/r2.js';
 
 const router = Router();
 
@@ -78,7 +78,7 @@ router.get('/:slug', asyncHandler(async (req, res) => {
 
 router.post('/', requireAuth, upload.fields([
     { name: 'coverImage', maxCount: 1 },
-    { name: 'contentImages', maxCount: 10 }
+    { name: 'contentImages', maxCount: 20 }
 ]), asyncHandler(async (req, res) => {
     const validated = projectSchema.parse(req.body);
     const { skillIds, publishedAt, ...projectData } = validated;
@@ -94,36 +94,20 @@ router.post('/', requireAuth, upload.fields([
     }
 
     let coverImageUrl = projectData.coverImage;
-    let content = projectData.content;
+    let contentImageUrls: string[] = [];
 
     if (files?.coverImage?.[0]) {
-        const imagekit = getImageKit();
-
-        const result = await imagekit.upload({
-            file: files.coverImage[0].buffer,
-            fileName: files.coverImage[0].originalname,
-            folder: `/${user.username}/projects`,
-            tags: [user.username, req.user!.userId, 'project-cover'],
-        });
+        const result = await uploadToR2(files.coverImage[0].buffer, files.coverImage[0].originalname, user.username, 'projects');
 
         coverImageUrl = result.url;
     }
 
+    // Upload content images
     if (files?.contentImages) {
-        const imagekit = getImageKit();
+        for (const file of files.contentImages) {
+            const result = await uploadToR2(file.buffer, file.originalname, user.username, 'projects');
 
-        for (let i = 0; i < files.contentImages.length; i++) {
-            const file = files.contentImages[i];
-            if (!file) continue;
-
-            const result = await imagekit.upload({
-                file: file.buffer,
-                fileName: file.originalname,
-                folder: `/${user.username}/projects`,
-                tags: [user.username, req.user!.userId, 'project-content'],
-            });
-
-            content = content.replace(`{{IMAGE_${i}}}`, result.url);
+            contentImageUrls.push(result.url);
         }
     }
 
@@ -131,8 +115,8 @@ router.post('/', requireAuth, upload.fields([
 
     const [newProject] = await db.insert(projects).values({
         ...projectData,
-        content,
         coverImage: coverImageUrl,
+        contentImages: contentImageUrls.length > 0 ? contentImageUrls : null,
         publishedAt: publishedAtDate,
         userId: req.user!.userId,
     }).returning();
@@ -165,7 +149,7 @@ router.post('/', requireAuth, upload.fields([
 
 router.put('/:id', requireAuth, upload.fields([
     { name: 'coverImage', maxCount: 1 },
-    { name: 'contentImages', maxCount: 10 }
+    { name: 'contentImages', maxCount: 20 }
 ]), asyncHandler(async (req, res) => {
     const { id } = req.params;
     const validated = projectSchema.parse(req.body);
@@ -189,36 +173,28 @@ router.put('/:id', requireAuth, upload.fields([
     }
 
     let coverImageUrl = projectData.coverImage;
-    let content = projectData.content;
+    let contentImageUrls: string[] = existing.contentImages || [];
 
     if (files?.coverImage?.[0]) {
-        const imagekit = getImageKit();
-
-        const result = await imagekit.upload({
-            file: files.coverImage[0].buffer,
-            fileName: files.coverImage[0].originalname,
-            folder: `/${user.username}/projects`,
-            tags: [user.username, req.user!.userId, 'project-cover'],
-        });
+        const result = await uploadToR2(files.coverImage[0].buffer, files.coverImage[0].originalname, user.username, 'projects');
 
         coverImageUrl = result.url;
     }
 
+    if (req.body.existingContentImages) {
+        try {
+            contentImageUrls = JSON.parse(req.body.existingContentImages);
+        } catch (e) {
+            contentImageUrls = [];
+        }
+    } else {
+        contentImageUrls = existing.contentImages || [];
+    }
+
     if (files?.contentImages) {
-        const imagekit = getImageKit();
-
-        for (let i = 0; i < files.contentImages.length; i++) {
-            const file = files.contentImages[i];
-            if (!file) continue;
-
-            const result = await imagekit.upload({
-                file: file.buffer,
-                fileName: file.originalname,
-                folder: `/${user.username}/projects`,
-                tags: [user.username, req.user!.userId, 'project-content'],
-            });
-
-            content = content.replace(`{{IMAGE_${i}}}`, result.url);
+        for (const file of files.contentImages) {
+            const result = await uploadToR2(file.buffer, file.originalname, user.username, 'projects');
+            contentImageUrls.push(result.url);
         }
     }
 
@@ -226,7 +202,13 @@ router.put('/:id', requireAuth, upload.fields([
 
     const [updated] = await db
         .update(projects)
-        .set({ ...projectData, content, coverImage: coverImageUrl, publishedAt: publishedAtDate, updatedAt: new Date() })
+        .set({
+            ...projectData,
+            coverImage: coverImageUrl,
+            contentImages: contentImageUrls.length > 0 ? contentImageUrls : null,
+            publishedAt: publishedAtDate,
+            updatedAt: new Date()
+        })
         .where(eq(projects.id, id!))
         .returning();
 

@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, varchar, timestamp, integer, json } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, varchar, timestamp, integer, json, boolean } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Users Table
@@ -18,8 +18,8 @@ export const userDetails = pgTable('user_details', {
     userId: uuid('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 255 }).notNull(),
     role: varchar('role', { length: 255 }).notNull(),
-    description: text('description').notNull(),
-    socialMedias: json('social_medias').$type<string[]>().notNull().default([]),
+    description: text('description'),
+    socialMedias: json('social_medias').$type<string[]>(),
     profilePhoto: text('profile_photo'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -42,7 +42,7 @@ export const experience = pgTable('experience', {
     startYear: integer('start_year').notNull(),
     endYear: integer('end_year'), // null means currently employed
     companyName: varchar('company_name', { length: 255 }).notNull(),
-    description: text('description').notNull(),
+    description: text('description'),
     location: varchar('location', { length: 255 }).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -54,7 +54,7 @@ export const education = pgTable('education', {
     userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     year: varchar('year', { length: 50 }).notNull(), // e.g., "2001-2008"
     institutionName: varchar('institution_name', { length: 255 }).notNull(),
-    description: text('description').notNull(),
+    description: text('description'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -66,7 +66,7 @@ export const certifications = pgTable('certifications', {
     name: varchar('name', { length: 255 }).notNull(),
     issuingOrganization: varchar('issuing_organization', { length: 255 }).notNull(),
     year: integer('year').notNull(),
-    description: text('description').notNull(),
+    description: text('description'),
     certificateLink: text('certificate_link'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -81,6 +81,8 @@ export const projects = pgTable('projects', {
     description: text('description').notNull(),
     content: text('content').notNull(), // Rich text/markdown content
     coverImage: text('cover_image'), // URL to image hosting
+    contentImages: json('content_images').$type<string[]>(), // Array of image URLs for gallery
+    published: boolean('published').default(false).notNull(),
     publishedAt: timestamp('published_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),

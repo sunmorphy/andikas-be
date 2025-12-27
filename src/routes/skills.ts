@@ -6,7 +6,7 @@ import { skills, users } from '../db/schema.js';
 import { skillSchema } from '../validators/index.js';
 import { asyncHandler, NotFoundError } from '../utils/errors.js';
 import { requireAuth } from '../middleware/auth.js';
-import { getImageKit } from '../utils/imagekit.js';
+import { uploadToR2 } from '../services/r2.js';
 
 const router = Router();
 
@@ -62,33 +62,27 @@ router.get('/:id', asyncHandler(async (req, res) => {
 router.post('/', requireAuth, upload.single('icon'), asyncHandler(async (req, res) => {
     const validated = skillSchema.parse(req.body);
 
-    let iconUrl = validated.icon;
-
-    if (req.file) {
-        const [user] = await db.select().from(users).where(eq(users.id, req.user!.userId));
-
-        if (!user) {
-            return res.status(401).json({
-                success: false,
-                error: 'User not found',
-            });
-        }
-
-        const imagekit = getImageKit();
-
-        const result = await imagekit.upload({
-            file: req.file.buffer,
-            fileName: req.file.originalname,
-            folder: `/${user.username}/skills`,
-            tags: [user.username, req.user!.userId, 'skill-icon'],
+    if (!req.file) {
+        return res.status(400).json({
+            success: false,
+            error: 'Icon file is required',
         });
-
-        iconUrl = result.url;
     }
 
+    const [user] = await db.select().from(users).where(eq(users.id, req.user!.userId));
+
+    if (!user) {
+        return res.status(401).json({
+            success: false,
+            error: 'User not found',
+        });
+    }
+
+    const result = await uploadToR2(req.file.buffer, req.file.originalname, user.username, 'skills');
+
     const [newSkill] = await db.insert(skills).values({
-        ...validated,
-        icon: iconUrl,
+        name: validated.name,
+        icon: result.url,
         userId: req.user!.userId,
     }).returning();
 
@@ -109,7 +103,7 @@ router.put('/:id', requireAuth, upload.single('icon'), asyncHandler(async (req, 
         throw new NotFoundError('Skill not found');
     }
 
-    let iconUrl = validated.icon;
+    let iconUrl = existing.icon;
 
     if (req.file) {
         const [user] = await db.select().from(users).where(eq(users.id, req.user!.userId));
@@ -121,21 +115,14 @@ router.put('/:id', requireAuth, upload.single('icon'), asyncHandler(async (req, 
             });
         }
 
-        const imagekit = getImageKit();
-
-        const result = await imagekit.upload({
-            file: req.file.buffer,
-            fileName: req.file.originalname,
-            folder: `/${user.username}/skills`,
-            tags: [user.username, req.user!.userId, 'skill-icon'],
-        });
+        const result = await uploadToR2(req.file.buffer, req.file.originalname, user.username, 'skills');
 
         iconUrl = result.url;
     }
 
     const [updated] = await db
         .update(skills)
-        .set({ ...validated, icon: iconUrl, updatedAt: new Date() })
+        .set({ name: validated.name, icon: iconUrl, updatedAt: new Date() })
         .where(eq(skills.id, id!))
         .returning();
 

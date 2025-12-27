@@ -2,6 +2,88 @@
 
 Base URL: `http://localhost:3000/api`
 
+## Authentication
+
+### POST /auth/register
+Register a new user account. **Automatically creates user details** with default values.
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com",
+  "username": "johndoe",
+  "password": "password123",
+  "name": "John Doe"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "uuid",
+      "email": "user@example.com",
+      "username": "johndoe",
+      "name": "John Doe"
+    },
+    "token": "jwt_token_here"
+  }
+}
+```
+
+### POST /auth/login
+Login with **email or username**.
+
+**Request Body:**
+```json
+{
+  "identifier": "user@example.com",
+  "password": "password123"
+}
+```
+*Note: `identifier` can be either email or username*
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "uuid",
+      "email": "user@example.com",
+      "username": "johndoe",
+      "name": "John Doe"
+    },
+    "token": "jwt_token_here"
+  }
+}
+```
+
+### GET /auth/me
+Get current authenticated user information.
+
+**Headers:**
+```
+Authorization: Bearer {token}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "username": "johndoe",
+    "name": "John Doe"
+  }
+}
+```
+
+---
+
 ## Health Check
 
 ### GET /health
