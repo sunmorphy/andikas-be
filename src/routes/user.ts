@@ -29,18 +29,46 @@ router.get('/', asyncHandler(async (req, res) => {
     const userId = req.user?.userId;
 
     if (!userId) {
-        throw new NotFoundError('User details not found');
+        return res.status(401).json({
+            success: false,
+            error: 'Authentication required',
+        });
     }
 
-    const [user] = await db.select().from(userDetails).where(eq(userDetails.userId, userId));
+    const userDetail = await db.query.userDetails.findFirst({
+        where: eq(userDetails.userId, userId),
+    });
 
-    if (!user) {
+    if (!userDetail) {
         throw new NotFoundError('User details not found');
     }
 
     res.json({
         success: true,
-        data: user,
+        data: userDetail,
+    });
+}));
+
+router.get('/:username', asyncHandler(async (req, res) => {
+    const { username } = req.params;
+
+    const [user] = await db.select().from(users).where(eq(users.username, username!));
+
+    if (!user) {
+        throw new NotFoundError('User not found');
+    }
+
+    const userDetail = await db.query.userDetails.findFirst({
+        where: eq(userDetails.userId, user.id),
+    });
+
+    if (!userDetail) {
+        throw new NotFoundError('User details not found');
+    }
+
+    res.json({
+        success: true,
+        data: userDetail,
     });
 }));
 

@@ -39,6 +39,23 @@ router.get('/', asyncHandler(async (req, res) => {
     });
 }));
 
+router.get('/user/:username', asyncHandler(async (req, res) => {
+    const { username } = req.params;
+
+    const [user] = await db.select().from(users).where(eq(users.username, username!));
+
+    if (!user) {
+        throw new NotFoundError('User not found');
+    }
+
+    const userSkills = await db.select().from(skills).where(eq(skills.userId, user.id));
+
+    res.json({
+        success: true,
+        data: userSkills,
+    });
+}));
+
 router.get('/:id', asyncHandler(async (req, res) => {
     const { id } = req.params;
     const userId = req.user?.userId;

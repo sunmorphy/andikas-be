@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { eq, and } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { education } from '../db/schema.js';
+import { education, users } from '../db/schema.js';
 import { educationSchema } from '../validators/index.js';
 import { asyncHandler, NotFoundError } from '../utils/errors.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -18,6 +18,23 @@ router.get('/', asyncHandler(async (req, res) => {
     res.json({
         success: true,
         data: allEducation,
+    });
+}));
+
+router.get('/user/:username', asyncHandler(async (req, res) => {
+    const { username } = req.params;
+
+    const [user] = await db.select().from(users).where(eq(users.username, username!));
+
+    if (!user) {
+        throw new NotFoundError('User not found');
+    }
+
+    const userEducation = await db.select().from(education).where(eq(education.userId, user.id));
+
+    res.json({
+        success: true,
+        data: userEducation,
     });
 }));
 

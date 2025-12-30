@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { eq, and } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { certifications, certificationSkills } from '../db/schema.js';
+import { certifications, certificationSkills, users } from '../db/schema.js';
 import { certificationSchema } from '../validators/index.js';
 import { asyncHandler, NotFoundError } from '../utils/errors.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -27,6 +27,32 @@ router.get('/', asyncHandler(async (req, res) => {
     res.json({
         success: true,
         data: allCertifications,
+    });
+}));
+
+router.get('/user/:username', asyncHandler(async (req, res) => {
+    const { username } = req.params;
+
+    const [user] = await db.select().from(users).where(eq(users.username, username!));
+
+    if (!user) {
+        throw new NotFoundError('User not found');
+    }
+
+    const userCertifications = await db.query.certifications.findMany({
+        where: eq(certifications.userId, user.id),
+        with: {
+            certificationSkills: {
+                with: {
+                    skill: true,
+                },
+            },
+        },
+    });
+
+    res.json({
+        success: true,
+        data: userCertifications,
     });
 }));
 

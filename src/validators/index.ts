@@ -64,6 +64,10 @@ export const projectSchema = z.object({
         (val) => val === 'true' || val === true,
         z.boolean()
     ).default(false),
+    highlighted: z.preprocess(
+        (val) => val === 'true' || val === true,
+        z.boolean()
+    ).default(false),
     publishedAt: z.string().datetime().optional().nullable(),
     skillIds: z.array(z.string().uuid()).default([]),
 });

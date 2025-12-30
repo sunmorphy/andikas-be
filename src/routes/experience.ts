@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { eq, and } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { experience, experienceSkills } from '../db/schema.js';
+import { experience, experienceSkills, users } from '../db/schema.js';
 import { experienceSchema } from '../validators/index.js';
 import { asyncHandler, NotFoundError } from '../utils/errors.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -27,6 +27,32 @@ router.get('/', asyncHandler(async (req, res) => {
     res.json({
         success: true,
         data: allExperience,
+    });
+}));
+
+router.get('/user/:username', asyncHandler(async (req, res) => {
+    const { username } = req.params;
+
+    const [user] = await db.select().from(users).where(eq(users.username, username!));
+
+    if (!user) {
+        throw new NotFoundError('User not found');
+    }
+
+    const userExperience = await db.query.experience.findMany({
+        where: eq(experience.userId, user.id),
+        with: {
+            experienceSkills: {
+                with: {
+                    skill: true,
+                },
+            },
+        },
+    });
+
+    res.json({
+        success: true,
+        data: userExperience,
     });
 }));
 

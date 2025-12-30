@@ -47,6 +47,62 @@ router.get('/', asyncHandler(async (req, res) => {
     });
 }));
 
+router.get('/user/:username', asyncHandler(async (req, res) => {
+    const { username } = req.params;
+
+    const [user] = await db.select().from(users).where(eq(users.username, username!));
+
+    if (!user) {
+        throw new NotFoundError('User not found');
+    }
+
+    const userProjects = await db.query.projects.findMany({
+        where: eq(projects.userId, user.id),
+        with: {
+            projectSkills: {
+                with: {
+                    skill: true,
+                },
+            },
+        },
+    });
+
+    res.json({
+        success: true,
+        data: userProjects,
+    });
+}));
+
+router.get('/user/:username/:slug', asyncHandler(async (req, res) => {
+    const { username, slug } = req.params;
+
+    const [user] = await db.select().from(users).where(eq(users.username, username!));
+
+    if (!user) {
+        throw new NotFoundError('User not found');
+    }
+
+    const project = await db.query.projects.findFirst({
+        where: and(eq(projects.slug, slug!), eq(projects.userId, user.id)),
+        with: {
+            projectSkills: {
+                with: {
+                    skill: true,
+                },
+            },
+        },
+    });
+
+    if (!project) {
+        throw new NotFoundError('Project not found');
+    }
+
+    res.json({
+        success: true,
+        data: project,
+    });
+}));
+
 router.get('/:slug', asyncHandler(async (req, res) => {
     const { slug } = req.params;
     const userId = req.user?.userId;

@@ -83,6 +83,7 @@ export const projects = pgTable('projects', {
     coverImage: text('cover_image'), // URL to image hosting
     contentImages: json('content_images').$type<string[]>(), // Array of image URLs for gallery
     published: boolean('published').default(false).notNull(),
+    highlighted: boolean('highlighted').default(false).notNull(), // Featured/highlighted project
     publishedAt: timestamp('published_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
