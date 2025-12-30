@@ -27,14 +27,14 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
-app.use('/auth', authRouter);
-app.use('/user', userRouter);
-app.use('/skills', skillsRouter);
-app.use('/experience', experienceRouter);
-app.use('/education', educationRouter);
-app.use('/certifications', certificationsRouter);
-app.use('/projects', projectsRouter);
-app.use('/upload', uploadRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/user', userRouter);
+app.use('/api/skills', skillsRouter);
+app.use('/api/experience', experienceRouter);
+app.use('/api/education', educationRouter);
+app.use('/api/certifications', certificationsRouter);
+app.use('/api/projects', projectsRouter);
+app.use('/api/upload', uploadRouter);
 
 // 404 handler
 app.use((req, res) => {

@@ -51,10 +51,12 @@ router.get('/', asyncHandler(async (req, res) => {
 
 router.get('/:username', asyncHandler(async (req, res) => {
     const { username } = req.params;
+    console.log(username);
 
     const [user] = await db.select().from(users).where(eq(users.username, username!));
 
     if (!user) {
+        console.log(username);
         throw new NotFoundError('User not found');
     }
 
